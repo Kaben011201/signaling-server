@@ -1,16 +1,7 @@
-import { WebSocketServer } from "ws";
-
-const PORT = process.env.PORT || 3001;
-const wss = new WebSocketServer({ port: PORT });
-
-// roomId -> Set(ws)
-const rooms = new Map();
-
 wss.on("connection", (ws) => {
   ws.on("message", (msg) => {
     const data = JSON.parse(msg.toString());
 
-    // JOIN ROOM
     if (data.type === "join") {
       ws.roomId = data.roomId;
       ws.userId = data.userId;
@@ -19,10 +10,21 @@ wss.on("connection", (ws) => {
         rooms.set(ws.roomId, new Set());
       }
 
-      rooms.get(ws.roomId).add(ws);
+      const clients = rooms.get(ws.roomId);
 
-      // Notify existing users
-      rooms.get(ws.roomId).forEach((client) => {
+      // 🟢 Send existing users to the new client
+      const existingUsers = [...clients].map((c) => c.userId);
+      ws.send(
+        JSON.stringify({
+          type: "existing-users",
+          users: existingUsers,
+        }),
+      );
+
+      clients.add(ws);
+
+      // Notify others
+      clients.forEach((client) => {
         if (client !== ws) {
           client.send(
             JSON.stringify({
@@ -32,14 +34,11 @@ wss.on("connection", (ws) => {
           );
         }
       });
-
-      return;
     }
 
-    // RELAY SIGNAL
     if (data.type === "signal") {
       rooms.get(ws.roomId)?.forEach((client) => {
-        if (client !== ws && client.userId === data.to) {
+        if (client.userId === data.to) {
           client.send(JSON.stringify(data));
         }
       });
@@ -61,5 +60,3 @@ wss.on("connection", (ws) => {
     });
   });
 });
-
-console.log("🚀 Signaling server running on port", PORT);
