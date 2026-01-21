@@ -3,7 +3,7 @@ import { WebSocketServer } from "ws";
 const PORT = process.env.PORT || 3001;
 const wss = new WebSocketServer({ port: PORT });
 
-// roomId → Set<ws>
+// roomId -> Set(ws)
 const rooms = new Map();
 
 wss.on("connection", (ws) => {
@@ -20,15 +20,18 @@ wss.on("connection", (ws) => {
 
       const clients = rooms.get(ws.roomId);
 
+      // 🟢 Send existing users to the new client
+      const existingUsers = [...clients].map((c) => c.userId);
       ws.send(
         JSON.stringify({
           type: "existing-users",
-          users: [...clients].map((c) => c.userId),
+          users: existingUsers,
         }),
       );
 
       clients.add(ws);
 
+      // Notify others
       clients.forEach((client) => {
         if (client !== ws) {
           client.send(
@@ -66,4 +69,4 @@ wss.on("connection", (ws) => {
   });
 });
 
-console.log("🚀 Signaling server running on", PORT);
+console.log("🚀 Signaling server running on port", PORT);
